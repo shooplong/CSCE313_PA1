@@ -35,11 +35,35 @@ void requestData(FIFORequestChannel& chan, int p) {
 	// PT said to use ofstream
 	ofstream ofs("received/x1.csv");
 
+	double time = 0.0;
 	// iterate 1000 times
 	for (int i = 0; i < 1000; i++) {
 		// write time into x1.csv (time is 0.004 second deviations)
-	}
+		
+		// prep the request for ecg1, also datamsg is in format of person, time, and ecg1 in this case, it will find it for us
+		datamsg msg1(p, time, 1);
+		// send request for ecg1 datamsg into pipe, cwrite is in format of void* msgbuf, msg size
+		chan.cwrite(&msg1, sizeof(datamsg)); // i was gonna do sizeof(msg1) at first but realized datamsg better b/c more general.
+		// read response for ecg1 from pipe
+		double ecg1;
+		chan.cread(&ecg1, sizeof(double)); // this reads the actual ecg1 value, store that value we got into &ecg1
+		// write ecg1 value into x1.csv
+		ofs << time << "," << ecg1;
 
+		// prep req ecg2
+		datamsg msg2(p, time, 2);
+		// send req for ecg1 datamsg into pipe
+		chan.cwrite(&msg2, sizeof(datamsg));
+		// read response for ecg2 from pipe
+		double ecg2;
+		chan.cread(&ecg2, sizeof(double));
+		// write ecg2 value into x1.csv
+		ofs << "," << ecg2 << endl;
+
+		// increment time
+		time += 0.004;
+	}
+	ofs.close();
 	
 }
 
