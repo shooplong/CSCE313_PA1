@@ -25,7 +25,7 @@ void requestDataPoint(FIFORequestChannel& chan, int p, double t, int e) {
 	double reply;
 	chan.cread(&reply, sizeof(double));
 
-	cout << "For person " << p << ", at time " << t << ", the value of ecg " << e << " is " << reply << endl;
+	std::cout << "For person " << p << ", at time " << t << ", the value of ecg " << e << " is " << reply << endl;
 }
 
 // this requests 1000 data points
@@ -66,6 +66,64 @@ void requestData(FIFORequestChannel& chan, int p) {
 	ofs.close();
 	
 }
+// this is 3rd task: req a file under BIMDC/ given file name, by sequentially req data chunks from the file and copying into a new file of the same name into received/
+void requestFile(FIFORequestChannel& chan, const std::string& filename, int buffer_size) {
+	filemsg fm(0, 0); // req the file length message, size of the thing we working with
+	string fname = filename; // 
+
+	// this calculates the file length request message and set up buffer
+	int len = sizeof(filemsg) + (fname.size() + 1); // this is just the size of buffer we want to send the file req to the server
+	char* buf2 = new char[len];
+
+	// copies filemsg fm into msgBuffer, attach filename to the end of filemsg fm in msgBuffer, then write msgBuffer into pipe
+	memcpy(buf2, &fm, sizeof(filemsg));
+	strcpy(buf2 + sizeof(filemsg), fname.c_str());
+	chan.cwrite(buf2, len);
+	delete[] buf2;
+
+	//Read file length response from server for specified file
+	__int64_t file_length;
+	chan.cread(&file_length, sizeof(__int64_t)); // put file length into variable file_length
+	std::cout << "The length of " << fname << " is " << file_length << endl;
+
+	// Set up output file under received folder
+	ofstream ofs("received/" + fname);
+
+	// Req data chunks from server and output into the file
+	// Loop from start of file to file_length
+	// need to figure out how many times to loop. So like if 1000 / 256 then we need to loop 3 times + a remainder. Would be bad to loop 4 times b/c then we have extra possibly bad values
+	int fullBiome = file_length / buffer_size;
+	int remainder = file_length - (fullBiome * buffer_size);
+
+	for (int i = 0; i < fullBiome; i++){
+		// create filemsg for data chunk range
+		// assign data chunk range properly so that the data chunk to fetch from does NOT exceed the file length -> my answer: i can just do the biomes that are guaranteed to be full (in relation to buffer_size) and then 
+		__int64_t offset = i * buffer_size;
+		filemsg fm_biome(offset, buffer_size);
+
+		// copy fm_biome into buf2 buffer and write into pipe
+		len = sizeof(filemsg) + fname.size() + 1; // new buffer size
+		buf2 = new char[len];
+		memcpy(buf2, &fm_biome, sizeof(filemsg)); // was doing &fullBiome instead of fm_biome and it was messing it up!!!
+		strcpy(buf2 + sizeof(filemsg), fname.c_str());
+
+		chan.cwrite(buf2, len);
+		delete[] buf2;
+
+		char* buf3 = new char[buffer_size]; // make sure to delete this later since we used "new"
+		chan.cread(buf3, buffer_size);
+
+		ofs.write(buf3, buffer_size);
+		delete[] buf3;
+		// now we have 3 full chunks written. Well not 3 but like full size - how many full chunks we have, next we have to handle the remainder
+	}
+
+	// handle remainder of file (if there is a remainder, probably tho what are the odds)
+	if (remainder > 0){
+		
+	}
+
+}
 
 
 int main (int argc, char *argv[]) {
@@ -98,6 +156,7 @@ int main (int argc, char *argv[]) {
 		}
 	}	
 
+	// p xor f, not both
 	if (p != 1 && !filename.empty()){ // not necessary for test PT said but just a good little check
 		EXITONERROR("Both p and f were specified");
 	}
@@ -121,8 +180,15 @@ int main (int argc, char *argv[]) {
 	//Task 2:
 	//Request data points
 	if ( p ) {
-		if ( t ) requestDataPoint(chan, p, t, e); // this is if we do "./client -p 1 -t 0.000 -e 1"
-		else requestData(chan, p); // if we only do "./clienmmt -p 1" then obviously they want all of patient 1
+		if ( t ) {
+			requestDataPoint(chan, p, t, e); // this is if we do "./client -p 1 -t 0.000 -e 1"
+		}
+		else {
+			requestData(chan, p); // if we only do "./clienmmt -p 1" then obviously they want all of patient 1
+		}
+	} 
+	else if ( filename ) {
+		requestFile(chan, filename, buffer_size);
 	}
 
 	
@@ -143,16 +209,16 @@ int main (int argc, char *argv[]) {
 	filemsg fm(0, 0);
 	string fname = "1.csv";
 	
-	int len = sizeof(filemsg) + (fname.size() + 1);
-	char* buf2 = new char[len];
-	memcpy(buf2, &fm, sizeof(filemsg));
-	strcpy(buf2 + sizeof(filemsg), fname.c_str());
-	chan.cwrite(buf2, len);
+	// int len = sizeof(filemsg) + (fname.size() + 1);
+	// char* buf2 = new char[len];
+	// memcpy(buf2, &fm, sizeof(filemsg));
+	// strcpy(buf2 + sizeof(filemsg), fname.c_str());
+	// chan.cwrite(buf2, len);
 
-	delete[] buf2;
-	__int64_t file_length;
-	chan.cread(&file_length, sizeof(__int64_t));
-	cout << "The length of " << fname << " is " << file_length << endl;
+	// delete[] buf2;
+	// __int64_t file_length;
+	// chan.cread(&file_length, sizeof(__int64_t));
+	// cout << "The length of " << fname << " is " << file_length << endl;
 	
 	//Task 5:
 	// Closing all the channels
