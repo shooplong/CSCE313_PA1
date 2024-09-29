@@ -6,9 +6,9 @@
     Date: 9/15/2024
 	
 	Please include your Name, UIN, and the date below
-	Name:
-	UIN:
-	Date:
+	Name: Long Pham
+	UIN: 532003876
+	Date: 9/29/2024
 */
 #include "common.h"
 #include "FIFORequestChannel.h"
@@ -23,8 +23,10 @@ int main (int argc, char *argv[]) {
 	int e = 1;
 	string filename = "";
 
-	//Add other arguments here
-	while ((opt = getopt(argc, argv, "p:t:e:f:")) != -1) {
+	int buffer_size = MAX_MESSAGE;
+
+	//Add other arguments here, need to add -c and -m case
+	while ((opt = getopt(argc, argv, "p:t:e:f:c:m:")) != -1) {
 		switch (opt) {
 			case 'p':
 				p = atoi (optarg);
@@ -38,11 +40,26 @@ int main (int argc, char *argv[]) {
 			case 'f':
 				filename = optarg;
 				break;
+			case 'm':
+				buffer_size = atoi (optarg);
+				break;
 		}
-	}
+	}	
 
+	if (p != 1 && !filename.empty()){ // not necessary for test PT said but just a good little check
+		EXITONERROR("Both p and f were specified");
+	}
 	//Task 1:
-	//Run the server process as a child of the client process
+	//Run the server process as a child of the client process, so we will need fork() and then exec()
+	char* cmd[] = {(char*)"./server", (char*)"-m", (char*)to_string(buffer_size).c_str(),nullptr};
+	int pid = fork();
+
+	if (pid < 0){
+		EXITONERROR("Child fork didn't work");
+	}
+	if (pid == 0){ // the child will run this
+		execvp(cmd[0], cmd);
+	}
 
     FIFORequestChannel chan("control", FIFORequestChannel::CLIENT_SIDE);
 
