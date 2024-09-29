@@ -15,6 +15,34 @@
 
 using namespace std;
 
+// this is for single data point transfer
+void requestDataPoint(FIFORequestChannel& chan, int p, double t, int e) {
+	char buf[MAX_MESSAGE];
+	datamsg x(1, 0.0, 1);
+
+	memcpy(buf, &x, sizeof(datamsg));  // copy datamsg into sep buffer then write into pipe
+	chan.cwrite(&x, sizeof(datamsg)); // but we can just directly write datamsg into pipe
+	double reply;
+	chan.cread(&reply, sizeof(double));
+
+	cout << "For person " << p << ", at time " << t << ", the value of ecg " << e << " is " << reply << endl;
+}
+
+// this requests 1000 data points
+// request 1000 data points from the server and write the results into received/ x1.csv with same file format as the patient {1-15}.csv files
+void requestData(FIFORequestChannel& chan, int p) {
+	// open x1.csv file under./received/
+	// PT said to use ofstream
+	ofstream ofs("received/x1.csv");
+
+	// iterate 1000 times
+	for (int i = 0; i < 1000; i++) {
+		// write time into x1.csv (time is 0.004 second deviations)
+	}
+
+	
+}
+
 
 int main (int argc, char *argv[]) {
 	int opt;
@@ -68,14 +96,23 @@ int main (int argc, char *argv[]) {
 	
 	//Task 2:
 	//Request data points
-    char buf[MAX_MESSAGE];
-    datamsg x(1, 0.0, 1);
+	if ( p ) {
+		if ( t ) requestDataPoint(chan, p, t, e); // this is if we do "./client -p 1 -t 0.000 -e 1"
+		else requestData(chan, p); // if we only do "./clienmmt -p 1" then obviously they want all of patient 1
+	}
+
 	
-	memcpy(buf, &x, sizeof(datamsg));
-	chan.cwrite(buf, sizeof(datamsg));
-	double reply;
-	chan.cread(&reply, sizeof(double));
-	cout << "For person " << p << ", at time " << t << ", the value of ecg " << e << " is " << reply << endl;
+
+
+	// i moved all these into a function
+    // char buf[MAX_MESSAGE];
+    // datamsg x(1, 0.0, 1);
+	
+	// memcpy(buf, &x, sizeof(datamsg));
+	// chan.cwrite(buf, sizeof(datamsg));
+	// double reply;
+	// chan.cread(&reply, sizeof(double));
+	// cout << "For person " << p << ", at time " << t << ", the value of ecg " << e << " is " << reply << endl;
 	
 	//Task 3:
 	//Request files
