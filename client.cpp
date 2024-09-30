@@ -82,7 +82,7 @@ void requestFile(FIFORequestChannel& chan, const std::string& filename, int buff
 	delete[] buf2;
 
 	//Read file length response from server for specified file
-	__int64_t file_length;
+	__int64_t file_length; // this is the key thing here! we need it for fullBiome variable later
 	chan.cread(&file_length, sizeof(__int64_t)); // put file length into variable file_length
 	std::cout << "The length of " << fname << " is " << file_length << endl;
 
@@ -107,7 +107,7 @@ void requestFile(FIFORequestChannel& chan, const std::string& filename, int buff
 		memcpy(buf2, &fm_biome, sizeof(filemsg)); // was doing &fullBiome instead of fm_biome and it was messing it up!!!
 		strcpy(buf2 + sizeof(filemsg), fname.c_str());
 
-		chan.cwrite(buf2, len);
+		chan.cwrite(buf2, len); // req for 1 full biome
 		delete[] buf2;
 
 		char* buf3 = new char[buffer_size]; // make sure to delete this later since we used "new"
@@ -120,9 +120,24 @@ void requestFile(FIFORequestChannel& chan, const std::string& filename, int buff
 
 	// handle remainder of file (if there is a remainder, probably tho what are the odds)
 	if (remainder > 0){
-		
-	}
+		__int64_t offset = fullBiome * buffer_size; // so it would be like 3 * 256 = 768, this would be our offset now after doing the guaranteed full biomes
+		filemsg fm_remainder(offset, remainder); // very important that we use the remainder here
 
+		int len = sizeof(filemsg) + (fname.size() + 1);
+		buf2 = new char[len];
+
+		memcpy(buf2, &fm_remainder, sizeof(filemsg));
+		strcpy(buf2 + sizeof(filemsg), fname.c_str());
+		chan.cwrite(buf2, len); // req for remainder
+		delete[] buf2; 
+
+		char* buf3 = new char[remainder]; // buffer equal to size of the remainder
+		chan.cread(buf3, remainder);
+
+		ofs.write(buf3, remainder);
+		delete[] buf3;
+	}
+	ofs.close();
 }
 
 
