@@ -140,6 +140,26 @@ void requestFile(FIFORequestChannel& chan, const std::string& filename, int buff
 	ofs.close();
 }
 
+// task 4: request a new FIFORequestChannel
+// must send a req to server to est a new FIFORequestChannel, and use the servers response to create the client's FIFORequestChannel
+// client must now communicate over this new RequestChannel for any data point or file transfers
+
+void openChannel(FIFORequestChannel& cont_chan, vector<FIFORequestChannel*>& channels) {
+	MESSAGE_TYPE m = NEWCHANNEL_MSG;
+	// write new channel message into pipe
+	cont_chan.cwrite(&m, sizeof(MESSAGE_TYPE));
+
+	// read response from pipe (can create any static sized char array that fits server response, eg MAX_MESSAGE)
+	char newPipeName[MAX_MESSAGE];
+	cont_chan.cread(newPipeName, MAX_MESSAGE);
+
+
+	// create a new FIFORequestChannel object using the name sent by server
+	FIFORequestChannel* chan2 = new FIFORequestChannel(newPipeName, FIFORequestChannel::CLIENT_SIDE);
+
+	channels.push_back(chan2);
+}
+
 
 int main (int argc, char *argv[]) {
 	int opt;
@@ -149,6 +169,8 @@ int main (int argc, char *argv[]) {
 	string filename = "";
 
 	int buffer_size = MAX_MESSAGE;
+	vector<FIFORequestChannel*> channels;
+	bool newChannelReq = false;
 
 	//Add other arguments here, need to add -c and -m case
 	while ((opt = getopt(argc, argv, "p:t:e:f:c:m:")) != -1) {
@@ -167,6 +189,9 @@ int main (int argc, char *argv[]) {
 				break;
 			case 'm':
 				buffer_size = atoi (optarg);
+				break;
+			case 'c':
+				newChannelReq = true;
 				break;
 		}
 	}	
@@ -187,10 +212,17 @@ int main (int argc, char *argv[]) {
 		execvp(cmd[0], cmd);
 	}
 
-    FIFORequestChannel chan("control", FIFORequestChannel::CLIENT_SIDE);
+    FIFORequestChannel cont_chan("control", FIFORequestChannel::CLIENT_SIDE);
+	channels.push_back(&cont_chan);
 
 	//Task 4:
 	//Request a new channel
+	if ( newChannelReq == 1 ){
+		openChannel(cont_chan, channels);
+	}
+
+	// make sure to use the latest / newest chan for our og "chan" variable
+	FIFORequestChannel chan = *(channels.back());
 	
 	//Task 2:
 	//Request data points
@@ -202,7 +234,7 @@ int main (int argc, char *argv[]) {
 			requestData(chan, p); // if we only do "./clienmmt -p 1" then obviously they want all of patient 1
 		}
 	} 
-	else if ( filename ) {
+	else if ( !filename.empty() ) {
 		requestFile(chan, filename, buffer_size);
 	}
 
@@ -221,8 +253,8 @@ int main (int argc, char *argv[]) {
 	
 	//Task 3:
 	//Request files
-	filemsg fm(0, 0);
-	string fname = "1.csv";
+	// filemsg fm(0, 0);
+	// string fname = "1.csv";
 	
 	// int len = sizeof(filemsg) + (fname.size() + 1);
 	// char* buf2 = new char[len];
@@ -237,6 +269,18 @@ int main (int argc, char *argv[]) {
 	
 	//Task 5:
 	// Closing all the channels
+	// close all the ones i pushed back to the vector
+	if (newChannelReq == 1){
+		MESSAGE_TYPE m = QUIT_MSG;
+		chan.cwrite(&m, sizeof(MESSAGE_TYPE));
+
+		delete channels.back();
+		channels.pop_back();
+
+		chan = *(channels.front()); // switches back to the OG control
+
+	}
+
     MESSAGE_TYPE m = QUIT_MSG;
     chan.cwrite(&m, sizeof(MESSAGE_TYPE));
 }
