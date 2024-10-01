@@ -81,7 +81,7 @@ int main (int argc, char *argv[]) {
 		cont_chan.cwrite(&nc, sizeof(MESSAGE_TYPE));
 
 		// read response from pipe (can create any static sized char array that fits server response, eg MAX_MESSAGE)
-		char newPipeName[1024];
+		char newPipeName[1024]; // discord said to do this
 		cont_chan.cread(newPipeName, sizeof(newPipeName));
 
 
@@ -275,6 +275,6 @@ int main (int argc, char *argv[]) {
 	// waitpid(pid, &status, 0);
 	cont_chan.cwrite(&quit_m, sizeof(MESSAGE_TYPE));
 
-	wait(nullptr);
+	wait(nullptr); // wait to prevent zombie kids
 
 }
